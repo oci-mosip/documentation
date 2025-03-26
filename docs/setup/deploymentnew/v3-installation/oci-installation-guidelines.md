@@ -59,7 +59,7 @@ DNS zone management will be done in OCI [DNS](https://www.oracle.com/au/cloud/ne
 
 |    | **Domain name**                                                     | **Mapping details**                    | **Purpose**                                                                                                                                                                                                                                     |
 | -- | ------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1  | [landing-page.sandbox.xyx.net](http://landing-page.sandbox.xyx.net)                           | Private Load balancer of MOSIP cluster | Index page for links to different dashboards of Mosip env. (This is just for reference, Please do not expose this page in a real production or uat environment)                                                                                 |
+| 1  | [landing-page.sandbox.xyz.net](http://landing-page.sandbox.xyx.net)                           | Private Load balancer of MOSIP cluster | Index page for links to different dashboards of Mosip env. (This is just for reference, Please do not expose this page in a real production or uat environment)                                                                                 |
 | 2  | [api-internal.sandbox.xyz.net](http://api-internal.sandbox.xyz.net) | Private Load balancer of MOSIP cluster | Internal API’s are exposed through this domain. They are accessible privately over wireguard channel                                                                                                                                            |
 | 3  | [api.sandbox.xyx.net](http://api.sandbox.xyx.net)                   | Public Load balancer of MOSIP cluster  | All the API’s that are publically usable are exposed using this domain.                                                                                                                                                                         |
 | 4  | [prereg.sandbox.xyz.net](http://prereg.sandbox.xyz.net)             | Public Load balancer of MOSIP cluster  | Domain name for Mosip’s pre-registration portal. The portal is accessible publicly.                                                                                                                                                             |
@@ -97,16 +97,85 @@ As only secured `https` connections are allowed via nginx server, you will need 
     - region
     - private_key
 -   Create a customer secret key for storing terraform state in remote bucket as per [OCI Docs](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/s3compatibleapi.htm#usingAPI)
--   Capture the values for
-    - s3 access key
-    - s3 secret key
-    - s3 region
-    - s3 comptability api endpoint
--   Create bucket for storing terraform state files
-    - capture the name of the bucket
--   Create DNS zone in OCI and delegate the zone control
--   Create software Vault and master vault encryption key in OCI
 
+   ```bash
+      ## Create S3 compatible api secret and key
+      oci iam customer-secret-key create \
+          --display-name mosip-terragrunt-s3 \
+          --user-id ocid1.user.oc1..aaaaaaaak | \
+          jq -r '.data | "AWS_ACCESS_KEY_ID=\(.id)\nAWS_SECRET_ACCESS_KEY=\(.key)"'
+
+      e.g
+      AWS_ACCESS_KEY_ID=39445a5f23a9aeec4xxxxxxx
+      AWS_SECRET_ACCESS_KEY=PbcqJt9iL2P7j7xxxxxxxxw=
+
+      ## Get the region code
+      export REGION=$(
+          oci iam region-subscription list | \
+          jq -r '.data[] | select(.["is-home-region"] == true) | .["region-name"]'
+      )
+
+      ## Get the object storage namespace
+      export OCI_OSS_NS=$(oci os ns get | jq -r '.data')
+
+      ## S3 compatible api endpoint
+      export OCI_S3_ENDPOINT=https://${OCI_OSS_NS}.compat.objectstorage.${REGION}.oraclecloud.com
+      
+   ```
+-   Create bucket for storing terraform state files
+
+   ```bash
+      ## Create object storage bucket for storing terraform state files
+      export BUCKET_NAME=$(
+          oci os bucket create \
+              -c ocid1.compartment.oc1..aaaaaaaand \
+              --name mosip_terragrunt_state_bucket | \
+          jq -r '.data.name'
+      )
+   ```
+-   Create DNS zone in OCI and delegate the zone control
+   ```bash
+      ## Create DNS Zone
+      export ZONE_ID=$(
+          oci dns zone create \
+              -c ocid1.compartment.oc1..aaaaaaaand \
+              --name sandbox.xyz.net \
+              --zone-type PRIMARY | \
+          jq -r '.data.id'
+      )
+
+   ```
+
+-   Delegate a DNS zone from your DNS registrar to OCI public DNS as per [Docs](https://blogs.oracle.com/cloud-infrastructure/post/delegate-dns-zone-oci-public-dns)
+
+-   Create software Vault and master vault encryption key in OCI
+   ```bash
+      ## Create KMS Vault for Secrets Management
+      export VAULT_ID=$(
+          oci kms management vault create \
+              -c ocid1.compartment.oc1..aaaaaaaanq \
+              --display-name mosip-dev-vault \
+              --vault-type DEFAULT | jq -r '.data.id'
+      )
+
+      ## Get the vault management endpoint
+      export MANAGEMENT_ENDPOINT=$(
+          oci kms management vault get \
+              --vault-id $VAULT_ID | jq -r \
+              '.data | select(.["lifecycle-state"] == "ACTIVE") | .["management-endpoint"]'
+      )
+
+      ## Create a master encryption key
+      export MASTER_ENC_KEY=$(
+          oci kms management key create \
+              --compartment-id ocid1.compartment.oc1..aaaaaaaa \
+              --display-name master-enc-key \
+              --key-shape '{"algorithm":"AES","length":"32"}' \
+              --endpoint $MANAGEMENT_ENDPOINT \
+              --protection-mode SOFTWARE | jq -r '.data.id'
+      )
+
+   ```
 
 ### Installation
 
