@@ -3,17 +3,25 @@
 ### Overview
 
 * MOSIP modules are deployed in the form of microservices in a Kubernetes cluster.
-* VPN is required for MOSIP operations. The implementer is free to choose the appropriate vpn.
+* VPN is required for MOSIP operations. The implementer is free to choose the appropriate vpn.[Wireguard](https://www.wireguard.com/) is used as a trust network extension to access the admin, control, and observation pane
 * It is also used for on-the-field registrations.
 * MOSIP uses OCI load balancers for:
   * SSL termination
   * Reverse Proxy
   * CDN/Cache management
   * Loadbalancing
-* In this deployment setup V3, we have one [OKE](https://www.oracle.com/au/cloud/cloud-native/kubernetes-engine/) cluster
+
+* Kubernetes cluster is administered using the [Rancher](https://rancher.com/docs/rancher/v1.3/en/kubernetes/#rancher-ui) and [OKE](https://www.oracle.com/in/cloud/cloud-native/kubernetes-engine/)
+* In V3, we have two Kubernetes clusters:
+  * Observation Cluster - This cluster is a part of the observation plane and it helps in administrative tasks. By design, this is kept independent of the actual cluster as a good security practice and to ensure clear segregation of roles and responsibilities. As a best practice, this cluster or its services should be internal and should never be exposed to the external world.
+    * [Rancher](https://rancher.com/docs/rancher/v1.3/en/kubernetes/#rancher-ui) is used for managing the Mosip cluster.
+    * [Keycloak](https://www.keycloak.org/) in this cluster is used for cluster user access management.
+    * It is recommended to configure log monitoring and network monitoring in this cluster.
+    * In case you have a internal container registry, then it should run here.
   * MOSIP Cluster - This cluster runs all the MOSIP components and certain third party components to secure the cluster, API’s and Data.
     * [MOSIP External Components](https://github.com/mosip/mosip-infra/blob/v1.2.0.1-B1/deployment/v3/external/README.md#mosip-external-components)
     * [Mosip Services](https://github.com/mosip/mosip-infra/blob/v1.2.0.1-B1/deployment/v3/mosip/README.md#mosip-services)
+
   * ArgoCD - The deployment and gitops is handled by ArgoCD(https://argo-cd.readthedocs.io/en/stable/ )
 
 ### Deployment Repos
@@ -28,11 +36,11 @@
 VM’s required have any Operating System and can be selected as per convenience.\
 In this installation guide, we are referring to `Oracle Linux` throughout.
 
-|   | **Purpose**                         | **vCPU’s** | **RAM** | **Storage (HDD)** | **no. of VM’s** | 
-| - | ----------------------------------- | ---------- | ------- | ----------------- | --------------- | 
-| 1 | Bastion Host                        | 2          | 4 GB    | 50 GB             | 1               | 
-| 2 | Operator Host                       | 2          | 4 GB    | 50 GB             | 1               | 
-| 3 | Mosip Cluster nodes (EKS managed)   | 8          | 32 GB   | 100 GB            | 6               | 
+|   | **Purpose**                         | **vCPU’s** | **RAM** | **Storage (HDD)** | **no. of VM’s** | **HA**                           |
+| - | ----------------------------------- | ---------- | ------- | ----------------- | --------------- | -------------------------------- |
+| 1 | Wireguard Bastion Host              | 2          | 4 GB    | 50 GB              | 1               | (ensure to setup active-passive) |
+| 2 | Rancher Cluster nodes (OCI managed) | 2          | 8 GB    | 50 GB              | 2               | 2                                |
+| 3 | Mosip Cluster nodes (OCI managed)   | 8          | 32 GB   | 100 GB             | 6               | 6                                |
 
 #### Network Requirements
 
@@ -49,8 +57,7 @@ In this installation guide, we are referring to `Oracle Linux` throughout.
 
 |   | **Purpose VM**         | **Network Interfaces**                                                                                                                                                                                                                                                                            |
 | - | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 | Bastion Host | <ul><li>One Private interface: that is on the same network as all the rest of nodes. (Eg: inside local NAT Network )</li><li>One public interface: Either has a direct public IP, or a firewall NAT (global address) rule that forwards traffic on 51820/udp port to this interface ip.</li></ul> |
-| 2 | Operator Host | <ul><li>One Private interface: that is on the same network as all the rest of nodes. (Eg: inside local NAT Network )</li></ul> |
+| 1 | Wireguard Bastion Host | <ul><li>One Private interface: that is on the same network as all the rest of nodes. (Eg: inside local NAT Network )</li><li>One public interface: Either has a direct public IP, or a firewall NAT (global address) rule that forwards traffic on 51820/udp port to this interface ip.</li></ul> |
 
 #### DNS Requirements
 
@@ -85,7 +92,7 @@ DNS zone management will be done in OCI [DNS](https://www.oracle.com/au/cloud/ne
 
 As only secured `https` connections are allowed via nginx server, you will need the below mentioned valid ssl certificates:
 
-* One valid wildcard ssl certificate related to domain used for accessing MOSIP cluster which will be created using [cert-manager](https://cert-manager.io/). In above e.g. \*.[sandbox.xyz.net](http://sandbox.xyz.net/) is the similiar example domain.
+* SSL certificate related to domain used for accessing MOSIP cluster which will be created using [cert-manager](https://cert-manager.io/). In above e.g. \*.[sandbox.xyz.net](http://sandbox.xyz.net/) is the similiar example domain.
 
 #### Prerequisite for complete deployment in Personal Computer
 -   Install Docker
@@ -179,16 +186,120 @@ As only secured `https` connections are allowed via nginx server, you will need 
 
 ### Installation
 
+The entire deployment is automated with minimum human intervention. At the end of the deployment 
+   - MOSIP OKE cluster will be created along with the mosip deployment modules
+   - Rancher will deployed in Observation cluster along with keycloak integration
+   - MOSIP cluster will be imported into Rancher
+   - Wireguard vpn will be installed and ready to use.
+   - All DNS zone records will be updated.
+   
+#### [Wireguard](https://www.wireguard.com/)
+
+A Wireguard bastion host (Wireguard server) provides secure private channel to access MOSIP cluster. The host restricts public access, and enables access to only those clients who have their public key listed in Wireguard server. Wireguard listens on UDP port 51820.
+
 #### Deployment diagram
 
 ![](../../../.gitbook/assets/oci_deployment_architecture.png)
 
 
-**Setup VPN:**
+#### Deployment control center
 
-TODO
+The deployment consists of two parts
+  - OCI infra provision (terraform)
+  - MOSIP application deployment ( ansible )
+
+The entire deployment is done from a docker container. This container has all the pre requisite softwares, like terragrunt, opentofu, oci ansible collections etc. The terraform state is stored in an object storage bucket. Even if the container get removed, the infra state file is still intact. The user just needs docker installed and they are good to go.
+
+First, clone this repository to your local machine.
+
+   ```bash
+   git clone https://github.com/oci-mosip/mosip-gitops.git -b mosip-document
+   cd mosip-gitops/docker-compose
+   ```
+
+Start the deployment control center
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+If docker compose is not available
+
+   ```bash
+      docker build -t mosip-control-center . && \
+      docker run -d \
+      --name mosip-control-center \
+      --entrypoint "sh" \
+      mosip-control-center -c "tail -f /dev/null"
+   ```
+
+Set Environment Variables
+
+   ```bash
+    docker exec -it mosip-control-center /bin/bash
+
+    cd /iac-run-dir
+    # modify environment variables in setenv from the pre requisite step
+    # REMOTE_STATE_S3_REGION
+    # REMOTE_STATE_S3_BUCKET
+    # REMOTE_STATE_S3_ENDPOINT
+    # AWS_REGION
+    # AWS_ACCESS_KEY_ID
+    # AWS_SECRET_ACCESS_KEY
+    # AWS_ENDPOINT_URL_S3
+    # TF_VAR_tenancy_ocid
+    # TF_VAR_region
+    # TF_VAR_user_ocid
+    # TF_VAR_fingerprint
+    # TF_VAR_private_key
+    source setenv
+    ./init.sh
+   ```
+
+Update the terraform variables
+
+   ```bash
+    docker exec -it mosip-control-center /bin/bash
+    cd /iac-run-dir
+    source setenv
+    cd /iac-run-dir/mosip-gitops/terragrunt/mosip/dev
+
+    # update the environment.yaml
+   ```
+
+**Setup Wirguard VM and wireguard bastion server:**
+
+The infra provisioning will create the bastion vm and start the docker container for wireguard.
+
 
 **Setup VPN Client in your laptop**
 
-TODO
+**Setup Wireguard Client in your PC**
+
+* Install [Wireguard client](https://www.wireguard.com/install/) in your PC.
+* Assign `wireguard.conf`:
+  * SSH to the wireguard server VM.
+  * `cd /etc/mosip_wg/`
+  * assign one of the PR for yourself and use the same from the PC to connect to the server.
+    * create `assigned.txt` file to assign the keep track of peer files allocated and update everytime some peer is allocated to someone.
+      * ```java
+        peer1 :   peername
+        peer2 :   xyz
+        ```
+    * Use `ls` cmd to see the list of peers.
+    * get inside your selected peer directory, and add mentioned changes in peer.conf:
+      * `cd peer1`
+      * `nano peer1.conf`
+        * Delete the DNS IP.
+        * Update the allowed IP's to subnets CIDR ip . e.g. 10.10.20.0/23
+      * Share the updated `peer.conf` with respective peer to connect to wireguard server from Personel PC.
+* add `peer.conf` in your PC’s `/etc/wireguard` directory as `wg0.conf`.
+* start the wireguard client and check the status:
+  * ```java
+    sudo systemctl start wg-quick@wg0
+    sudo systemctl status wg-quick@wg0
+    ```
+* Once Connected to wireguard you should be now able to login using private ip’s.
+
+
 
