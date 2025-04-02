@@ -25,8 +25,8 @@
   * ArgoCD - The deployment and gitops is handled by ArgoCD(https://argo-cd.readthedocs.io/en/stable/ )
 
 ### Deployment Repos
-* [mosip-infra](https://github.com/oci-mosip/mosip-gitops) : contains deployment scripts to run charts in defined sequence.
-* [mosip-config](https://github.com/mosip/mosip-config/tree/v1.2.0.1-B1) : contains all the configuration files required by the MOSIP modules.
+* [mosip-infra](https://github.com/oci-mosip/public-mosip-gitops) : contains deployment scripts to run charts in defined sequence.
+* [mosip-config](https://github.com/oci-mosip/mosip-config/tree/oci-v1.2.0.1-B4) : contains all the configuration files required by the MOSIP modules.
 * [mosip-helm](https://github.com/mosip/mosip-helm/tree/v1.2.0.1-B1) : contains packaged helm charts for all the MOSIP modules.
 
 ### Pre-requisites:
@@ -213,8 +213,8 @@ The entire deployment is done from a docker container. This container has all th
 First, clone this repository to your local machine.
 
    ```bash
-   git clone https://github.com/oci-mosip/mosip-gitops.git -b mosip-document
-   cd mosip-gitops/docker-compose
+   git clone https://github.com/oci-mosip/public-mosip-gitops.git -b mosip-document
+   cd public-mosip-gitops/docker-compose
    ```
 
 Start the deployment control center
@@ -262,7 +262,7 @@ Update the terraform variables
     docker exec -it mosip-control-center /bin/bash
     cd /iac-run-dir
     source setenv
-    cd /iac-run-dir/mosip-gitops/terragrunt/mosip/dev
+    cd /iac-run-dir/public-mosip-gitops/terragrunt/mosip/dev
 
     # update the environment.yaml
    ```
