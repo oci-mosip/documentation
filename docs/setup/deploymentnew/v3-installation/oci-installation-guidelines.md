@@ -256,7 +256,7 @@ Set Environment Variables
     ./init.sh
    ```
 
-Update the terraform variables
+Update the terraform variables & execute
 
    ```bash
     docker exec -it mosip-control-center /bin/bash
@@ -264,22 +264,29 @@ Update the terraform variables
     source setenv
     cd /iac-run-dir/public-mosip-gitops/terragrunt/mosip/dev
 
-    # update the environment.yaml
-      env: "dev"
-      region: ""                                         ## update region       
-      home_region: ""                                    ## update home region
-      domain: "sandbox.xyz.net"                          ## update the domain name
-      tenancy_id: "ocid1.tenancy.oc1..aaaaaaaa"
-      compartment_id: "ocid1.compartment.oc1..aaaaaaaa"  ## update the compartment id
-      vault_id: "ocid1.vault.oc1...."                    ## update the VAULT_ID as created earlier 
-      vault_enc_key_id: "ocid1.key.oc1..."               ## update the MASTER_ENC_KEY as created earlier
-      tags:
-      {
-         "Project": "MOSIP-Dev",  
-         "generic/owner": "FirstName-LastName",
-      }
-      k8s_cluster_properties:
-         cluster_name: mosipdev                  
+    # Update the environment.yaml
+    env: "dev"
+    region: ""                                         ## update region       
+    home_region: ""                                    ## update home region
+    domain: "sandbox.xyz.net"                          ## update the domain name
+    tenancy_id: "ocid1.tenancy.oc1..aaaaaaaa"
+    compartment_id: "ocid1.compartment.oc1..aaaaaaaa"  ## update the compartment id
+    vault_id: "ocid1.vault.oc1...."                    ## update the VAULT_ID as created earlier 
+    vault_enc_key_id: "ocid1.key.oc1..."               ## update the MASTER_ENC_KEY as created earlier
+    tags:
+    {
+       "Project": "MOSIP-Dev",  
+       "generic/owner": "FirstName-LastName",
+    }
+    k8s_cluster_properties:
+       cluster_name: mosipdev     
+
+   # Start provisioning
+    docker exec -it mosip-control-center /bin/bash
+    cd /iac-run-dir
+    source setenv
+    cd /iac-run-dir/public-mosip-gitops/terragrunt/mosip/dev
+    ./run.sh     
    ```
 
 **Setup Wirguard VM and wireguard bastion server:**
