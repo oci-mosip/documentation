@@ -95,6 +95,22 @@ As only secured `https` connections are allowed via nginx server, you will need 
 
 * SSL certificate related to domain used for accessing MOSIP cluster which will be created using [cert-manager](https://cert-manager.io/). In above e.g. \*.[sandbox.xyz.net](http://sandbox.xyz.net/) is the similiar example domain.
 
+#### Deployment diagram
+
+![](../../../.gitbook/assets/oci_deployment_architecture.png)
+
+### Installation
+
+The entire deployment is automated with minimum human intervention. At the end of the deployment 
+   - MOSIP OKE cluster will be created along with the mosip deployment modules
+   - Rancher will deployed in Observation cluster along with keycloak integration
+   - MOSIP cluster will be imported into Rancher
+   - Wireguard vpn will be installed and ready to use.
+   - All DNS zone records will be updated.
+   - ArgoCD will manage the application deployment
+   - Secrets management will be done by OCI vault service
+   
+
 #### Prerequisite for complete deployment in Personal Computer
 -   Install Docker
 -   Generate admin user api keys as per [OCI Docs](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#two)
@@ -184,23 +200,6 @@ As only secured `https` connections are allowed via nginx server, you will need 
       )
 
    ```
-
-### Installation
-
-The entire deployment is automated with minimum human intervention. At the end of the deployment 
-   - MOSIP OKE cluster will be created along with the mosip deployment modules
-   - Rancher will deployed in Observation cluster along with keycloak integration
-   - MOSIP cluster will be imported into Rancher
-   - Wireguard vpn will be installed and ready to use.
-   - All DNS zone records will be updated.
-   
-#### [Wireguard](https://www.wireguard.com/)
-
-A Wireguard bastion host (Wireguard server) provides secure private channel to access MOSIP cluster. The host restricts public access, and enables access to only those clients who have their public key listed in Wireguard server. Wireguard listens on UDP port 51820.
-
-#### Deployment diagram
-
-![](../../../.gitbook/assets/oci_deployment_architecture.png)
 
 
 #### Deployment control center
