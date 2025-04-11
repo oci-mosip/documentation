@@ -289,6 +289,109 @@ Update the terraform variables & execute
     ./run.sh     
    ```
 
+Application acess details
+
+At the end of infra provisioning , the output will be shown as below. This file is also available in /tmp/output/mosip/dev/output.txt
+
+   ```bash
+      MOSIP
+      ----------------
+
+      MOSIP modules are deployed in the form of microservices in a Kubernetes cluster.
+
+      Wireguard is used as a trust network extension to access the admin, control, and observation pane
+
+      Kubernetes cluster is administered using the Rancher and OKE
+
+      We have two kubernetes clusters:
+      Observation cluster: This cluster is a part of the observation plane and it helps in administrative tasks. 
+      Core cluster: This cluster runs all the MOSIP components and certain third party components to secure the cluster, API’s and Data.
+
+
+
+      VPN Setup
+      --------- 
+
+      Install Wireguard client in your Laptop.
+      Get the peer configuration file from wireguard
+
+      ssh to bastion node
+      ssh -i <bastion_private_key> opc@<bastion_public_ip>
+      cd /etc/mosip_wg/
+      create assigned.txt file to assign the keep track of peer files allocated and update everytime some peer is allocated to someone.
+      # assigned.txt
+      peer1: user1
+      peer2: user2
+      Copy the content of peer1/peer1.conf to any client machine.
+
+      On the client machine with wireguard client installed. Below example is for mac OS
+
+      save the copied peer1.conf to any location e.g /etc/wireguard/wg0.conf
+      start wireguard client
+      sudo wg-quick up /etc/wireguard/wg0.conf
+
+      To stop wireguard client
+      sudo wg-quick down /etc/wireguard/wg0.conf
+
+
+      URLS:
+      ----
+
+      Public: 
+      https://prereg.sandbox.xyz.net
+      https://resident.sandbox.xyz.net
+
+
+      VPN:
+      https://rancher.sandbox.xyz.net
+      https://keycloak-rancher.sandbox.xyz.net
+      https://argocd.sandbox.xyz.net/argocd
+      https://landingpage.sandbox.xyz.net
+
+
+      Credentials:
+      ------------
+
+      ssh to bastion node
+      ssh -i <bastion_private_key> opc@<bastion_public_ip>
+      export KUBECONFIG=/home/opc/.kube/oke_obs_config
+      ## Rancher keycloak credential, username: user
+      kubectl get secret --namespace keycloak keycloak -o go-template='{{index .data "admin-password" | base64decode }}{{"\n"}}'
+
+      ## Rancher admin credential , username: admin
+      kubectl get secret --namespace cattle-system bootstrap-secret -o go-template='{{index .data "bootstrapPassword" | base64decode }}{{"\n"}}'
+
+
+      Kubernetes Deployment Status
+      ----------------------------
+      ssh to bastion node
+      ssh -i <bastion_private_key> ubuntu@<bastion_public_ip>
+      sudo su - 
+
+      ## Observation cluster
+      export KUBECONFIG=/home/opc/.kube/oke_obs_config
+      kubectl get pods --all-namespaces
+
+      ## Core cluster
+      export KUBECONFIG=/home/opc/.kube/oke_k8s_config
+      kubectl get pods --all-namespaces
+
+      ## ArgoCD admin credential , username: admin
+      kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 --decode
+
+
+
+      Bastion Details:
+      ----------------
+      bastion user: opc
+      bastion public ip: <bastion_public_ip>
+      bastion private key:
+
+      <bastion_private_key>
+  
+   ```
+
+
 **Setup Wirguard VM and wireguard bastion server:**
 
 The infra provisioning will create the bastion vm and start the docker container for wireguard.
